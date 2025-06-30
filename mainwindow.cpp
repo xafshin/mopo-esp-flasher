@@ -153,10 +153,30 @@ void MainWindow::on_browse_btn_clicked()
 void MainWindow::scanner_handle()
 {
     QString selected = ui->comboBoxPorts->currentText();
+
+    int count = ui->comboBoxPorts->count();
+
+    const auto ports = QSerialPortInfo::availablePorts();
+    bool noChange = true;
+    if (ports.size() == count - 1) {
+        for (int i = 1; i < count; ++i) {
+            QString portName = ports[i-1].portName(); // e.g. COM3 or /dev/ttyUSB0
+            QString description = ports[i-1].description(); // e.g. "USB Serial Device"
+            QString displayText = QString("%1 (%2)").arg(portName, description);
+
+            if (ui->comboBoxPorts->itemText(i) != displayText)
+                noChange = false;
+        }
+    } else {
+        noChange = false;
+    }
+
+    if (noChange)
+        return;
+
     ui->comboBoxPorts->clear(); // Clear existing items
     ui->comboBoxPorts->addItem("Auto");
 
-    const auto ports = QSerialPortInfo::availablePorts();
     for (const QSerialPortInfo &port : ports) {
         QString portName = port.portName();       // e.g. COM3 or /dev/ttyUSB0
         QString description = port.description(); // e.g. "USB Serial Device"
@@ -165,6 +185,7 @@ void MainWindow::scanner_handle()
         ui->comboBoxPorts->addItem(displayText, portName); // Store portName as userData
     }
     ui->comboBoxPorts->setCurrentText(selected);
+
 }
 
 void MainWindow::run_esp_tool(QStringList args)
