@@ -34,7 +34,13 @@ private slots:
 
     void esptool_stdout();
     void esptool_stderror();
+    void esp_secure_stdout();
+    void esp_secure_stderror();
+    void esp_fuse_stdout();
+    void esp_fuse_stderror();
     void esptool_exit(int code);
+    void esp_secure_exit(int code);
+    void esp_fuse_exit(int code);
 
     void on_flash_btn_clicked();
 
@@ -52,14 +58,24 @@ private:
         QString offset;
         QString path;
     };
+    struct efuses_orders
+    {
+        QString block;
+        QString value;
+    };
 
     Ui::MainWindow *ui;
     QTimer *scanner_timer = nullptr;
     QProcess *esp_tool_process = nullptr;
+    QProcess *esp_efuse_process = nullptr;
+    QProcess *esp_secure_process = nullptr;
     QString esp_tool_path;
     void run_esp_tool(QStringList args);
+    void run_esp_fuse(QStringList args);
+    void run_esp_secure(QStringList args);
     QVector<binaries_list> get_table_binaries();
     void run_esp_tool_flash(QVector<binaries_list> binaries);
+    void burn_efuses(QString command, QVector<efuses_orders> orders);
     bool automatic_mode = false;
 };
 #endif // MAINWINDOW_H

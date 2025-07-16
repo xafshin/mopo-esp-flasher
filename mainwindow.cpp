@@ -46,6 +46,24 @@ MainWindow::MainWindow(QWidget *parent)
             &MainWindow::esptool_stderror);
     connect(esp_tool_process, &QProcess::finished, this, &MainWindow::esptool_exit);
 
+    esp_secure_process = new QProcess(this);
+    esp_secure_process->setProgram(esp_tool_path);
+    connect(esp_secure_process, &QProcess::readyReadStandardOutput, this, &MainWindow::esp_secure_stdout);
+    connect(esp_secure_process,
+            &QProcess::readyReadStandardError,
+            this,
+            &MainWindow::esp_secure_stderror);
+    connect(esp_secure_process, &QProcess::finished, this, &MainWindow::esp_secure_exit);
+
+    esp_efuse_process = new QProcess(this);
+    esp_efuse_process->setProgram(esp_tool_path);
+    connect(esp_efuse_process, &QProcess::readyReadStandardOutput, this, &MainWindow::esp_fuse_stdout);
+    connect(esp_efuse_process,
+            &QProcess::readyReadStandardError,
+            this,
+            &MainWindow::esp_fuse_stderror);
+    connect(esp_efuse_process, &QProcess::finished, this, &MainWindow::esp_fuse_exit);
+
     QFile orders(QDir::currentPath() + "/orders");
     if (orders.exists()) {
         automatic_mode = true;
@@ -249,8 +267,90 @@ void MainWindow::esptool_stderror()
         qDebug() << line;
     }
 }
+void MainWindow::esp_fuse_stdout()
+{
+    QByteArray data = esp_tool_process->readAllStandardOutput().replace('\r', "");
+    QStringList lines = QString::fromUtf8(data).split('\n', Qt::SkipEmptyParts);
+
+    for (const auto &line : lines) {
+        if (line.contains("Writing at 0x")) {
+            QStringList t1 = line.split('(');
+            if (t1.size() == 2) {
+                t1 = t1[1].split(')');
+                if (t1.size() == 2) {
+                    quint16 percent = t1[0].remove(' ').remove('%').toUInt();
+                    if (percent != 100)
+                        ui->progressBar->setValue(percent);
+                }
+            }
+        }
+
+        qDebug() << line;
+    }
+}
+
+void MainWindow::esp_fuse_stderror()
+{
+    QByteArray data = esp_tool_process->readAllStandardError().replace('\r', "");
+    QStringList lines = QString::fromUtf8(data).split('\n', Qt::SkipEmptyParts);
+
+    for (const auto &line : lines) {
+        qDebug() << line;
+    }
+}
+void MainWindow::esp_secure_stdout()
+{
+    QByteArray data = esp_tool_process->readAllStandardOutput().replace('\r', "");
+    QStringList lines = QString::fromUtf8(data).split('\n', Qt::SkipEmptyParts);
+
+    for (const auto &line : lines) {
+        if (line.contains("Writing at 0x")) {
+            QStringList t1 = line.split('(');
+            if (t1.size() == 2) {
+                t1 = t1[1].split(')');
+                if (t1.size() == 2) {
+                    quint16 percent = t1[0].remove(' ').remove('%').toUInt();
+                    if (percent != 100)
+                        ui->progressBar->setValue(percent);
+                }
+            }
+        }
+
+        qDebug() << line;
+    }
+}
+
+void MainWindow::esp_secure_stderror()
+{
+    QByteArray data = esp_tool_process->readAllStandardError().replace('\r', "");
+    QStringList lines = QString::fromUtf8(data).split('\n', Qt::SkipEmptyParts);
+
+    for (const auto &line : lines) {
+        qDebug() << line;
+    }
+}
 
 void MainWindow::esptool_exit(int code)
+{
+    qDebug() << "Exit code:" << code;
+    if (code == 0) {
+        ui->progressBar->setValue(100);
+    } else {
+        ui->progressBar->setValue(0);
+    }
+    ui_finnished();
+}
+void MainWindow::esp_secure_exit(int code)
+{
+    qDebug() << "Exit code:" << code;
+    if (code == 0) {
+        ui->progressBar->setValue(100);
+    } else {
+        ui->progressBar->setValue(0);
+    }
+    ui_finnished();
+}
+void MainWindow::esp_fuse_exit(int code)
 {
     qDebug() << "Exit code:" << code;
     if (code == 0) {
@@ -322,5 +422,36 @@ QVector<MainWindow::binaries_list> MainWindow::get_table_binaries()
 
 void MainWindow::on_stop_btn_clicked()
 {
-    esp_tool_process->terminate();
+    if(esp_tool_process->state() != QProcess::ProcessState::NotRunning)
+        esp_tool_process->terminate();
+}
+
+void MainWindow::burn_efuses(QString command, QVector<efuses_orders> orders)
+{
+    QStringList args;
+    args.push_back(command);
+    for (const auto &item : orders) {
+        args.push_back(item.block);
+        args.push_back(item.value);
+    }
+    run_esp_fuse(args);
+}
+
+void MainWindow::run_esp_fuse(QStringList args){
+    if (ui->comboBoxPorts->currentText() != "Auto") {
+        QString com = ui->comboBoxPorts->currentText().replace('\r', "").split(' ')[0];
+        args.push_front(com);
+        args.push_front("--port");
+    }
+    qDebug() << "args" << args;
+    esp_efuse_process->setArguments(args);
+    ui_running();
+    esp_efuse_process->start();
+}
+
+void MainWindow::run_esp_secure(QStringList args){
+    qDebug() << "args" << args;
+    esp_secure_process->setArguments(args);
+    ui_running();
+    esp_secure_process->start();
 }
